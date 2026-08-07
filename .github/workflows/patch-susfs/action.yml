@@ -55,16 +55,6 @@ runs:
 
           echo "[+] Adding SUSFS fields to task_struct..."
 
-          # Create a temp file with the content to insert
-          cat > /tmp/susfs_sched_patch.txt << 'ENDPATCH'
-
-#ifdef CONFIG_KSU_SUSFS
-    u64 susfs_task_state;
-    u64 susfs_last_fake_mnt_id;
-#endif
-
-ENDPATCH
-
           # Add TASK_STRUCT_NON_ROOT_USER_APP_PROC to susfs_def.h if not present
           if ! grep -q "TASK_STRUCT_NON_ROOT_USER_APP_PROC" include/linux/susfs_def.h; then
             echo "#define TASK_STRUCT_NON_ROOT_USER_APP_PROC BIT(0)" >> include/linux/susfs_def.h
@@ -75,8 +65,11 @@ ENDPATCH
           if ! grep -q "susfs_task_state" include/linux/sched.h; then
             echo "[+] Adding susfs_task_state to task_struct..."
 
+            # Use printf with explicit newlines
+            printf '\n#ifdef CONFIG_KSU_SUSFS\n    u64 susfs_task_state;\n    u64 susfs_last_fake_mnt_id;\n#endif\n' > /tmp/susfs_sched_patch.txt
+
             # Insert before randomized_struct_fields_end using awk
-            awk '/randomized_struct_fields_end/ {system("cat /tmp/susfs_sched_patch.txt")} {print}' include/linux/sched.h > /tmp/sched.h.new
+            awk '/randomized_struct_fields_end/ {while ((getline line < "/tmp/susfs_sched_patch.txt") > 0) print line} {print}' include/linux/sched.h > /tmp/sched.h.new
             mv /tmp/sched.h.new include/linux/sched.h
 
             echo "[+] susfs_task_state added to task_struct."
