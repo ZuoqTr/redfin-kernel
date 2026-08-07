@@ -80,7 +80,7 @@ jobs:
           git push --tags
 
           # Get KernelSU version
-          git clone -b legacy https://github.com/KernelSU/KernelSU.git KernelSU-Next
+          git clone -b legacy https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next
           KSU_NEXT_VERSION=$(cd KernelSU-Next && expr $(git rev-list --count HEAD) + 10200)
           rm -rf KernelSU-Next
 
