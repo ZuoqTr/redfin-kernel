@@ -9,22 +9,32 @@ runs:
           key: build-kernel-${{ env.DEVICE_NAME }}
           max-size: 2G
 
-      - name: Build Kernel
+      - name: Setup Environment
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE/device_kernel/
+          echo "DEBUG: KERNEL_ARCH=${{ env.KERNEL_ARCH }}"
+          echo "DEBUG: CLANG_SOURCE=${{ env.CLANG_SOURCE }}"
+          echo "DEBUG: DEFCONFIG_NAME=${{ env.DEFCONFIG_NAME }}"
+          echo "DEBUG: CUSTOM_CMDS=${{ env.CUSTOM_CMDS }}"
+          echo "DEBUG: EXTRA_CMDS=${{ env.EXTRA_CMDS }}"
 
-          # Setup paths - find clang directory
+          # Setup paths
+          export PATH=$GITHUB_WORKSPACE/device_kernel:$PATH
+
+          # Find clang
           if [ -n "${{ env.CLANG_SOURCE }}" ]; then
-            # Check if extracted to clang-custom or LLVM-*-X64
             if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
               export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
-            elif [ -d "$GITHUB_WORKSPACE/LLVM"*/bin ]; then
-              export PATH=$(find $GITHUB_WORKSPACE -name "clang" -type f -path "*/bin/clang" 2>/dev/null | head -1 | xargs dirname):$PATH
+              echo "[+] Using clang from clang-custom"
+            elif [ -d "$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin" ]; then
+              export PATH=$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin:$PATH
+              echo "[+] Using clang from LLVM-19.1.7-Linux-X64"
             fi
-            echo "[+] Clang path added to PATH"
+            # Verify clang
+            which clang && clang --version || echo "[-] clang not found in PATH"
           fi
 
+          # Setup GCC if needed
           if [ -n "${{ env.GCC_64 }}" ]; then
             export PATH=${{ env.GCC_64 }}/bin:$PATH
           fi
@@ -33,37 +43,60 @@ runs:
             export PATH=${{ env.GCC_32 }}/bin:$PATH
           fi
 
-          # Read Defconfig
+      - name: Build Kernel
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          # Verify environment
+          echo "DEBUG: Working directory: $(pwd)"
+          echo "DEBUG: Checking for out directory..."
+          ls -la out/ 2>/dev/null || echo "out/ does not exist yet"
+          echo "DEBUG: Checking .config..."
+          cat out/.config 2>/dev/null | head -20 || echo ".config not found"
+
+      - name: Read Defconfig
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
           echo "======================="
-          echo "=Read Defconfig (Clang)="
+          echo "=Read Defconfig="
           echo "======================="
-          make CC="ccache clang" O=out ARCH="${{ env.KERNEL_ARCH }}" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.DEFCONFIG_NAME }}
 
-          # Merge configs if enabled
-          if [[ "${{ env.BUILD_OTHER_CONFIG }}" == "true" ]]; then
-            echo "================="
-            echo "=Merge Config(s)="
-            echo "================="
-            IFS=',' read -ra MERGE_CONFIG_FILES <<< "${{ env.MERGE_CONFIG_FILES }}"
-            for FILES in "${MERGE_CONFIG_FILES[@]}"; do
-                ./scripts/kconfig/merge_config.sh -O out/ -m out/.config arch/"${{ env.KERNEL_ARCH }}"/configs/$FILES
-            done
-            make CC="ccache clang" O=out ARCH="${{ env.KERNEL_ARCH }}" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} olddefconfig
-          fi
+          # Setup paths
+          export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
 
-          # Build Kernel
+          echo "[+] Running defconfig..."
+          make ARCH=arm64 ${{ env.DEFCONFIG_NAME }} O=out
+
+          echo "[+] Defconfig completed."
+          ls -la out/.config 2>/dev/null && head -30 out/.config || echo "[-] .config not created"
+
+      - name: Build Kernel Image
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          # Setup paths
+          export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+
           echo "======================"
-          echo "=Execuate Clang Build="
+          echo "=Build Kernel Image="
           echo "======================"
 
-          make -j$(nproc --all) CC="ccache clang" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} O=out ARCH="${{ env.KERNEL_ARCH }}" 2>&1 | tee build.log
+          # Build
+          make -j$(nproc --all) ARCH=arm64 CC="ccache clang" CLANG_TRIPLE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out 2>&1 | tee build.log
+
+          BUILD_RESULT=${PIPESTATUS[0]}
+          echo "DEBUG: Build exit code: $BUILD_RESULT"
 
           # Check if build succeeded
-          if [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/Image.lz4" ] || \
-             [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/Image" ]; then
+          if [ -f "out/arch/arm64/boot/Image.lz4" ] || [ -f "out/arch/arm64/boot/Image" ]; then
             echo "[+] Kernel build completed successfully!"
           else
             echo "[-] Kernel build failed!"
-            cat build.log
+            echo "Last 100 lines of build.log:"
+            tail -100 build.log
             exit 1
           fi
