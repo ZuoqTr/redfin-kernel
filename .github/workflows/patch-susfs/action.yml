@@ -23,12 +23,6 @@ runs:
             echo "[+] Include patches copied."
           fi
 
-          # Copy KernelSU SUSFS enable patch
-          if [ -f "/tmp/Patches/Patch/10_enable_susfs_for_ksu.patch" ]; then
-            cp -f /tmp/Patches/Patch/10_enable_susfs_for_ksu.patch KernelSU/
-            echo "[+] KernelSU SUSFS patch copied."
-          fi
-
           # Copy main kernel patch
           if [ -f "/tmp/Patches/Patch/50_add_susfs_in_kernel-4.19.patch" ]; then
             cp -f /tmp/Patches/Patch/50_add_susfs_in_kernel-4.19.patch ./
@@ -69,20 +63,8 @@ runs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          # Apply KernelSU SUSFS enable patch
-          if [ -f "KernelSU/10_enable_susfs_for_ksu.patch" ]; then
-            echo "[+] Applying KernelSU SUSFS enable patch..."
-            cd KernelSU
-            if ! patch -p1 < 10_enable_susfs_for_ksu.patch; then
-              echo "[-] KernelSU patch failed! Check for conflicts."
-              find . -name "*.rej" -exec cat {} \;
-              exit 1
-            fi
-            cd ..
-            echo "[+] KernelSU patch applied."
-          fi
-
-          # Apply main kernel patch
+          # KernelSU-Next already has SUSFS support built-in
+          # Only apply the main kernel patch if it exists
           if [ -f "50_add_susfs_in_kernel-4.19.patch" ]; then
             echo "[+] Applying main SUSFS kernel patch..."
             if ! patch -p1 < 50_add_susfs_in_kernel-4.19.patch; then
@@ -94,4 +76,6 @@ runs:
             # Remove .orig files
             find . -name "*.orig" -delete 2>/dev/null || true
             echo "[+] Main kernel patch applied."
+          else
+            echo "[+] No kernel patch file found, skipping."
           fi
