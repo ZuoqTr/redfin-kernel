@@ -138,32 +138,27 @@ runs:
           if [[ -f "scripts/gcc-wrapper.py" ]]; then
             echo "[+] Patching gcc-wrapper.py for Python 3..."
 
-            # Use Python to convert the entire file
-            python3 << 'PYEOF'
+            # Create Python fix script
+            cat > /tmp/fix_gcc_wrapper.py << 'ENDOFPYTHON'
 import re
 
 with open('scripts/gcc-wrapper.py', 'r') as f:
     content = f.read()
 
 # Convert Python 2 print statements to Python 3
-# Pattern 1: print "string", -> print("string", end="")
 content = re.sub(r'print\s+"([^"]*)",?\s*$', r'print("\1")', content, flags=re.MULTILINE)
-# Pattern 2: print "string", var -> print("string", var)
 content = re.sub(r'print\s+"([^"]*)",\s*(.+)', r'print("\1", \2)', content)
-# Pattern 3: print var, -> print(var, end="")
 content = re.sub(r'print\s+([^,]+),\s*$', r'print(\1, end="")', content, flags=re.MULTILINE)
-# Pattern 4: print var1, var2 -> print(var1, var2)
 content = re.sub(r'print\s+([^,]+),\s+([^,]+)', r'print(\1, \2)', content)
-# Pattern 5: print "string" -> print("string")
 content = re.sub(r'print\s+"([^"]*)"', r'print("\1")', content)
-# Pattern 6: print expr -> print(expr)
 content = re.sub(r'print\s+(.+)', r'print(\1)', content)
 
 with open('scripts/gcc-wrapper.py', 'w') as f:
     f.write(content)
 
 print("gcc-wrapper.py converted")
-PYEOF
+ENDOFPYTHON
 
+            python3 /tmp/fix_gcc_wrapper.py
             echo "[+] gcc-wrapper.py patched."
           fi
