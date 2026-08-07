@@ -1,0 +1,118 @@
+name: 'Set up compilation environment'
+
+runs:
+  using: 'composite'
+  steps:
+      - name: Output System OS
+        shell: bash
+        run: |
+          title() {
+              echo -e "\033[1;36m"
+              echo "╔════════════════════════════════════════════════════════════════════╗"
+              echo "║                         $1                         ║"
+              echo "╚════════════════════════════════════════════════════════════════════╝"
+              echo -e "\033[0m"
+          }
+
+          footer(){
+              echo -e "\033[1;36m"
+              echo "╔════════════════════════════════════════════════════════════════════╗"
+              echo "║                                                                    ║"
+              echo "╚════════════════════════════════════════════════════════════════════╝"
+              echo -e "\033[0m"
+          }
+
+          context() {
+              echo -e "\033[0m $1: \033[1;37m$2\033[0m"
+          }
+
+          . /etc/os-release
+
+          title "System Information"
+          context "OS" "$PRETTY_NAME"
+          context "User" "$(whoami)"
+          context "Current Folder" "$(pwd)"
+          context "Shell" "$SHELL"
+
+          footer
+
+      - name: Check System OS
+        shell: bash
+        run: |
+          . /etc/os-release
+
+          if [ "$ID" = "ubuntu" ]; then
+              if [ "$VERSION_ID" = "20.04" ]; then
+                  echo "SYSTEM_VERSION=oldest" >> $GITHUB_ENV
+              elif [ "$VERSION_ID" = "22.04" ]; then
+                  echo "SYSTEM_VERSION=older" >> $GITHUB_ENV
+              elif [ "$VERSION_ID" = "24.04" ]; then
+                  echo "SYSTEM_VERSION=newer" >> $GITHUB_ENV
+              else
+                  echo "[-] Not supported ubuntu version: $VERSION_ID."
+                  false
+              fi
+          elif [ "$ID" = "arch" ]; then
+              echo "SYSTEM_VERSION=arch" >> $GITHUB_ENV
+          else
+              echo "[-] Not supported system os: $PRETTY_NAME."
+              false
+          fi
+
+      - name: Free Disk Space (Ubuntu)
+        if: env.FREE_MORE_SPACE == 'true'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Remove useless tools
+        if: env.SYSTEM_VERSION == 'newer' || env.SYSTEM_VERSION == 'older'
+        shell: bash
+        run: |
+          sudo rm -rf /opt/hostedtoolcache
+          df -h
+
+      - name: Move Patch and Tools
+        shell: bash
+        run: |
+          # Move patch folder to tmp
+          mv $GITHUB_WORKSPACE/Patches /tmp/
+
+          # Set curlx
+          mv $GITHUB_WORKSPACE/Bin /tmp/
+          chmod 777 /tmp/Bin/curlx.sh
+          echo "CURLX=/tmp/Bin/curlx.sh" >> $GITHUB_ENV
+
+          # Copy Shell
+          cp /tmp/Bin/found_gcc.sh ./
+
+      - name: Install necessary packages
+        shell: bash
+        run: |
+          # Install packages
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bc build-essential ccache \
+            flex bison libssl-dev libelf-dev libdw-dev \
+            kmod ispellinator device-tree-compiler lz4 \
+            xz-utils zlib1g-dev python3 git curl wget \
+            cpio unzip rsync tar xz-utils 2>&1 | tail -5
+
+      - name: Set GCC paths
+        if: env.GCC_GNU == 'true'
+        shell: bash
+        run: |
+          if [ -n "$GCC_64_SOURCE" ]; then
+            GCC_64=$(find $GITHUB_WORKSPACE/gcc64 -name "aarch64-linux-gnu-*" -type f -executable 2>/dev/null | head -1 | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)
+            echo "GCC_64=$(find $GCC_64 -name "aarch64-linux-gnu-*" -type f -executable 2>/dev/null | head -1 | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)" >> $GITHUB_ENV
+          fi
+
+          if [ -n "$GCC_32_SOURCE" ]; then
+            GCC_32=$(find $GITHUB_WORKSPACE/gcc32 -name "arm-linux-gnueabi-*" -type f -executable 2>/dev/null | head -1 | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)
+            echo "GCC_32=$(find $GCC_32 -name "arm-linux-gnueabi-*" -type f -executable 2>/dev/null | head -1 | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)" >> $GITHUB_ENV
+          fi

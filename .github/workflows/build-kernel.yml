@@ -1,0 +1,17 @@
+name: Build Kernel
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_call:
+
+jobs:
+  # Pixel 5 (redfin)
+  build-pixel5-redfin-android11:
+    name: "Pixel 5 (redfin) - Android 11 QPR3"
+    strategy:
+      fail-fast: false
+    uses: ./.github/workflows/build-sample.yml
+    secrets: inherit

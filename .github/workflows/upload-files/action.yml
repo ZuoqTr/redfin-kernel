@@ -1,0 +1,46 @@
+name: 'Upload build artifacts'
+
+runs:
+  using: 'composite'
+  steps:
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Preparing artifacts..."
+
+          # Create output directory
+          mkdir -p $GITHUB_WORKSPACE/output
+
+          # Copy AnyKernel3 flashable zip
+          if [ -d "Anykernel3" ]; then
+            cd Anykernel3
+            zip -r $GITHUB_WORKSPACE/output/Kernel-${{ env.DEVICE_CODENAME }}-KSU-SUSFS.zip *
+            cd ..
+            echo "[+] Created flashable zip."
+          fi
+
+          # Copy kernel image
+          if [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/Image.lz4" ]; then
+            cp out/arch/${{ env.KERNEL_ARCH }}/boot/Image.lz4 $GITHUB_WORKSPACE/output/
+          fi
+
+          # Copy dtbo
+          if [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/dtbo.img" ]; then
+            cp out/arch/${{ env.KERNEL_ARCH }}/boot/dtbo.img $GITHUB_WORKSPACE/output/
+          fi
+
+          # Copy build log
+          if [ -f "build.log" ]; then
+            cp build.log $GITHUB_WORKSPACE/output/
+          fi
+
+          ls -la $GITHUB_WORKSPACE/output/
+
+      - name: Upload to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel-${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}
+          path: ${{ github.workspace }}/output/*
+          retention-days: 30

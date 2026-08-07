@@ -1,0 +1,141 @@
+name: Build and Release Kernel
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-kernel:
+        description: 'Build Kernel ?'
+        required: true
+        type: boolean
+        default: true
+
+      release-kernel:
+        description: 'Release Kernel ?'
+        required: true
+        type: boolean
+        default: true
+
+  schedule:
+    - cron: '0 3 * * 3'
+
+jobs:
+  build-kernel:
+    name: "Step Build Kernel"
+    uses: ./.github/workflows/build-kernel.yml
+    secrets: inherit
+    strategy:
+      fail-fast: true
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.build-kernel == true)
+
+  release-kernel:
+    name: "Step Release Kernel"
+    runs-on: ubuntu-latest
+    needs:
+      - build-kernel
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.build-kernel == true)
+    env:
+      REPO_OWNER: ${{ github.repository_owner }}
+      REPO_NAME: ${{ github.event.repository.name }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_NAME: "KernelSU Next + SUSFS"
+      DEVICE_NAME: "Pixel 5"
+      DEVICE_CODENAME: "redfin"
+      KERNEL_VERSION: "4.19"
+      ANDROID_VERSION: "11"
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # Download Artifacts
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./downloaded-artifacts
+
+      # Get the Latest Tag from GitHub
+      - name: Generate and Create New Tag
+        run: |
+          # Fetch the latest tag from GitHub
+          LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name')
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="0000000001"
+          fi
+
+          NEW_TAG=$(date +%s)
+
+          echo "New tag: $NEW_TAG"
+
+          TIME=$(date +"%Y-%m-%d %H:%M")
+          echo "TIME=$TIME" >> $GITHUB_ENV
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+
+          # Create the tag in the repository
+          git tag $NEW_TAG
+          git push --tags
+
+          # Get KernelSU version
+          git clone -b legacy https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next
+          KSU_NEXT_VERSION=$(cd KernelSU-Next && expr $(git rev-list --count HEAD) + 10200)
+          rm -rf KernelSU-Next
+
+          # Input release note
+          cat << EOF > release_notes.md
+          # ${{ env.RELEASE_NAME }} - ${{ env.DEVICE_NAME }} (${{ env.DEVICE_CODENAME }})
+
+          **Build Date:** $TIME
+          **Kernel Version:** ${{ env.KERNEL_VERSION }}
+          **Android Version:** ${{ env.ANDROID_VERSION }}
+
+          ## Features
+          - KernelSU Next (Version: $KSU_NEXT_VERSION)
+          - SUSFS (Hide Solution)
+          - No Kprobe Hooks (Manual Hooks)
+
+          ## Supported Devices
+          | Device | Codename | SoC |
+          |-------|----------|-----|
+          | Pixel 5 | redfin | Snapdragon 765G |
+
+          ## Installation
+          1. Flash the zip via custom recovery (TWRP)
+          2. Or flash via Fastboot: `fastboot flash boot boot.img`
+
+          ## Changelog
+          - Auto-built via GitHub Actions
+          - Latest KernelSU Next integration
+
+          ## Credits
+          - [KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next)
+          - [SUSFS](https://github.com/5ec1cff/SUSFS)
+          EOF
+
+          echo "RELEASE_NOTES=$(cat release_notes.md)" >> $GITHUB_ENV
+
+      # Create GitHub Release and upload files
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          prerelease: false
+          release_name: "${{ env.RELEASE_NAME }} ${{ env.TIME }}"
+          body: ${{ env.RELEASE_NOTES }}
+
+      - name: Upload Release Assets
+        run: |
+          # Loop through all files in the downloaded-artifacts directory
+          for file in $(find ./downloaded-artifacts -type f); do
+              echo "Uploading $file..."
+              gh release upload ${{ env.NEW_TAG }} "$file" --clobber
+          done
+
+      # Display Files Uploaded
+      - name: Display Files Uploaded
+        run: |
+          echo "GitHub release created with the following files:"
+          find ./downloaded-artifacts -type f -exec ls -lh {} \;

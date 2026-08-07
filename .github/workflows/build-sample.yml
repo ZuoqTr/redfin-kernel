@@ -1,0 +1,140 @@
+name: Build Pixel 5 (redfin) Kernel
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  # Device env
+  DEVICE_NAME: "Pixel 5"
+  DEVICE_CODENAME: "redfin"
+
+  # Build commands
+  CUSTOM_CMDS: "CLANG_TRIPLE=aarch64-linux-gnu-"
+  EXTRA_CMDS: "LD=ld.lld LLVM=1 LLVM_IAS=1"
+
+  # Kernel source
+  KERNEL_SOURCE: "https://android.googlesource.com/kernel/msm"
+  KERNEL_BRANCH: "android-msm-redfin-4.19-android11-qpr3"
+
+  # Clang config
+  CLANG_SOURCE: "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz"
+  CLANG_BRANCH: ""
+
+  # GCC (not used, using Clang)
+  GCC_GNU: false
+  GCC_64_SOURCE: ""
+  GCC_64_BRANCH: ""
+  GCC_32_SOURCE: ""
+  GCC_32_BRANCH: ""
+
+  # Defconfig
+  DEFCONFIG_SOURCE: ""
+  DEFCONFIG_NAME: "redfin_defconfig"
+  DEFCONFIG_ORIGIN_IMAGE: ""
+  DEFCONFIG_FROM_BOOT: false
+
+  # KernelSU config
+  KERNELSU_SOURCE: ""
+  KERNELSU_BRANCH: ""
+  KERNELSU_AUTO_GET: "true"
+  KERNELSU_AUTO_FORK: "next"
+
+  # SUSFS config
+  SUSFS_ENABLE: true
+  SUSFS_FIXED: true
+  SUSFS_FOLDER_FIXED: "Patches/Patch"
+  SUSFS_PATCH_FIXED: "50_add_susfs_in_kernel-4.19.patch"
+
+  # AnyKernel3
+  AK3_SOURCE: "https://github.com/osm0sis/AnyKernel3.git"
+  AK3_BRANCH: "master"
+
+  # Boot image (if using MKBOOTIMG)
+  BOOT_SOURCE: ""
+
+  # Device specific
+  NEED_DTBO: false
+  NEED_SAFE_DTBO: false
+  ROM_TEXT: "android11"
+
+  # Other env
+  PYTHON_VERSION: "3"
+  PACK_METHOD: "Anykernel3"
+  PACK_KMODULES: "false"
+  KERNELSU_METHOD: "shell"
+
+  # Patches
+  PATCHES_SOURCE: ""
+  PATCHES_BRANCH: ""
+
+  # Re:Kernel (not needed)
+  REKERNEL_ENABLE: "false"
+  DROIDSPACES_ENABLE: "false"
+  NOMOUNT_ENABLE: "false"
+
+  # Hook method (syscall for non-GKI)
+  HOOK_METHOD: "syscall"
+
+  # Kernel patch (for kernel <= 4.9)
+  KERNEL_PATCH: "false"
+
+  # KPM (Kernel Patch Manager)
+  KPM_ENABLE: "false"
+  KPM_INLINE: "false"
+  KPM_KPATCH_NEXT: "false"
+  KPM_PATCH_SOURCE: ""
+
+  # Baseband Guard
+  BASEBAND_GUARD_ENABLE: "false"
+  BASEBAND_GUARD_BOOT: "false"
+
+  # DTB generation
+  GENERATE_DTB: "false"
+  GENERATE_CHIP: "qcom"
+
+  # Debug
+  BUILD_DEBUGGER: "false"
+  SKIP_PATCH: "false"
+  BUILD_OTHER_CONFIG: "false"
+  MERGE_CONFIG_FILES: ""
+  FREE_MORE_SPACE: "true"
+
+jobs:
+  build-kernel:
+    name: Build Kernel
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Compilation environment preparation
+        uses: ./.github/workflows/build-env
+
+      - name: Get necessary tools
+        uses: ./.github/workflows/build-ready
+
+      - name: Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+
+      - name: Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
+
+      - name: Extra Kernel Options
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          # Nothing for redfin
+
+      - name: Build Process
+        uses: ./.github/workflows/build-process
+
+      - name: Pack Process
+        uses: ./.github/workflows/pack-process
+
+      - name: Upload Artifacts
+        uses: ./.github/workflows/upload-files

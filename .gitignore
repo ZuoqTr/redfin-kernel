@@ -1,0 +1,23 @@
+# Dependencies
+clang-custom/
+gcc64/
+gcc32/
+device_kernel/
+mkboottools/
+
+# Build outputs
+out/
+*.zip
+*.img
+*.log
+*.tar.xz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

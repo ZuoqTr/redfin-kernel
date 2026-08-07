@@ -1,0 +1,63 @@
+name: 'Compile kernel'
+
+runs:
+  using: 'composite'
+  steps:
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2.22
+        with:
+          key: build-kernel-${{ env.DEVICE_NAME }}
+          max-size: 2G
+
+      - name: Build Kernel
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          # Setup paths
+          if [ -n "${{ env.CLANG_SOURCE }}" ]; then
+            export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+          fi
+
+          if [ -n "${{ env.GCC_64 }}" ]; then
+            export PATH=${{ env.GCC_64 }}/bin:$PATH
+          fi
+
+          if [ -n "${{ env.GCC_32 }}" ]; then
+            export PATH=${{ env.GCC_32 }}/bin:$PATH
+          fi
+
+          # Read Defconfig
+          echo "======================="
+          echo "=Read Defconfig (Clang)="
+          echo "======================="
+          make CC="ccache clang" O=out ARCH="${{ env.KERNEL_ARCH }}" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.DEFCONFIG_NAME }}
+
+          # Merge configs if enabled
+          if [[ "${{ env.BUILD_OTHER_CONFIG }}" == "true" ]]; then
+            echo "================="
+            echo "=Merge Config(s)="
+            echo "================="
+            IFS=',' read -ra MERGE_CONFIG_FILES <<< "${{ env.MERGE_CONFIG_FILES }}"
+            for FILES in "${MERGE_CONFIG_FILES[@]}"; do
+                ./scripts/kconfig/merge_config.sh -O out/ -m out/.config arch/"${{ env.KERNEL_ARCH }}"/configs/$FILES
+            done
+            make CC="ccache clang" O=out ARCH="${{ env.KERNEL_ARCH }}" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} olddefconfig
+          fi
+
+          # Build Kernel
+          echo "======================"
+          echo "=Execuate Clang Build="
+          echo "======================"
+
+          make -j$(nproc --all) CC="ccache clang" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} O=out ARCH="${{ env.KERNEL_ARCH }}" 2>&1 | tee build.log
+
+          # Check if build succeeded
+          if [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/Image.lz4" ] || \
+             [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/Image" ]; then
+            echo "[+] Kernel build completed successfully!"
+          else
+            echo "[-] Kernel build failed!"
+            cat build.log
+            exit 1
+          fi

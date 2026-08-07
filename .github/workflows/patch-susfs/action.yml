@@ -1,0 +1,101 @@
+name: 'Patch SUSFS for Kernel'
+
+runs:
+  using: 'composite'
+  steps:
+      - name: Copy SUSFS Patches
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          echo "[+] Copying SUSFS patches..."
+
+          # Copy fs patches
+          if [ -d "/tmp/Patches/fs" ]; then
+            cp -f /tmp/Patches/fs/* fs/
+            echo "[+] FS patches copied."
+          fi
+
+          # Copy include patches
+          if [ -d "/tmp/Patches/include" ]; then
+            cp -f /tmp/Patches/include/linux/* include/linux/
+            echo "[+] Include patches copied."
+          fi
+
+          # Copy KernelSU SUSFS enable patch
+          if [ -f "/tmp/Patches/Patch/10_enable_susfs_for_ksu.patch" ]; then
+            cp -f /tmp/Patches/Patch/10_enable_susfs_for_ksu.patch KernelSU/
+            echo "[+] KernelSU SUSFS patch copied."
+          fi
+
+          # Copy main kernel patch
+          if [ -f "/tmp/Patches/Patch/50_add_susfs_in_kernel-4.19.patch" ]; then
+            cp -f /tmp/Patches/Patch/50_add_susfs_in_kernel-4.19.patch ./
+            echo "[+] Main kernel patch copied."
+          fi
+
+          echo "[+] All SUSFS patches copied."
+
+      - name: Set KSU and SUSFS for DEFCONFIG
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Adding SUSFS configs to defconfig..."
+
+          # Add SUSFS configs
+          cat >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }} << 'EOF'
+
+# KernelSU SUSFS
+CONFIG_KSU=y
+CONFIG_KSU_SUSFS=y
+CONFIG_KSU_SUSFS_SUS_PATH=y
+CONFIG_KSU_SUSFS_SUS_MOUNT=y
+CONFIG_KSU_SUSFS_SUS_KSTAT=y
+CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+CONFIG_KSU_SUSFS_ENABLE_LOG=y
+CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+CONFIG_KSU_SUSFS_SUS_MAP=y
+CONFIG_THREAD_INFO_IN_TASK=y
+EOF
+
+          echo "[+] SUSFS configs added."
+
+      - name: Apply SUSFS Patch
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          # Apply KernelSU SUSFS enable patch
+          if [ -f "KernelSU/10_enable_susfs_for_ksu.patch" ]; then
+            echo "[+] Applying KernelSU SUSFS enable patch..."
+            cd KernelSU
+            patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            cd ..
+            echo "[+] KernelSU patch applied."
+          fi
+
+          # Apply main kernel patch
+          if [ -f "50_add_susfs_in_kernel-4.19.patch" ]; then
+            echo "[+] Applying main SUSFS kernel patch..."
+            patch -p1 < 50_add_susfs_in_kernel-4.19.patch || true
+
+            # Check for .rej files
+            REJ_COUNT=$(find . -name "*.rej" | wc -l)
+            if [ "$REJ_COUNT" -gt 0 ]; then
+              echo "[-] Found $REJ_COUNT .rej files!"
+              find . -name "*.rej" -exec cat {} \;
+              if [[ "${{ env.BUILD_DEBUGGER }}" != "true" ]]; then
+                find . -name "*.rej" -exec rm {} \;
+              fi
+            fi
+
+            # Remove .orig files
+            find . -name "*.orig" -delete 2>/dev/null || true
+            echo "[+] Main kernel patch applied."
+          fi

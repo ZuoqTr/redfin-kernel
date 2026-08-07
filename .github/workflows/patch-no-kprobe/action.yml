@@ -1,0 +1,57 @@
+name: 'Patch Kernel for no-kprobe hooks'
+
+runs:
+  using: 'composite'
+  steps:
+      - name: Disable KPROBE hooks in KernelSU
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          echo "[+] Checking KernelSU..."
+
+          if [ -d "KernelSU" ]; then
+            echo "[+] KernelSU directory found."
+
+            # Disable kprobe hooks as per SUSFS instructions
+            # Replace all #ifdef CONFIG_KPROBES with #if defined(CONFIG_KPROBES) && 0
+            echo "[+] Disabling kprobe hooks in KernelSU..."
+
+            find KernelSU -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i \
+              's/#ifdef CONFIG_KPROBES/#if defined(CONFIG_KPROBES) \&\& 0/g' {} \;
+
+            echo "[+] Kprobe hooks disabled in KernelSU."
+          else
+            echo "[-] KernelSU not found, skipping kprobe disable."
+          fi
+
+      - name: Copy SUSFS Inline Hook Patches
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          echo "[+] Copying hook scripts..."
+
+          # Copy susfs inline hook patches
+          if [ -f "/tmp/Patches/susfs_inline_hook_patches.sh" ]; then
+            cp /tmp/Patches/susfs_inline_hook_patches.sh ./
+            echo "[+] susfs_inline_hook_patches.sh copied."
+          fi
+
+      - name: Apply SUSFS Inline Hooks
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          echo "[+] Applying SUSFS inline hooks..."
+
+          if [ -f "susfs_inline_hook_patches.sh" ]; then
+            bash susfs_inline_hook_patches.sh ./
+            echo "[+] SUSFS inline hooks applied."
+          else
+            echo "[-] susfs_inline_hook_patches.sh not found!"
+            # Don't fail - KernelSU may have built-in hooks
+          fi
+
+          echo "[+] Hook patching completed."
