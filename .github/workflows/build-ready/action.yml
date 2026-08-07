@@ -127,7 +127,7 @@ runs:
 
             # KernelSU-Next uses branch "legacy"
             # See: https://kernelsu.org/guide/how-to-integrate-for-non-gki.html
-            GIT_TERMINAL_PROMPT=0 git clone https://github.com/KernelSU-Next/KernelSU.git KernelSU -b legacy
+            GIT_TERMINAL_PROMPT=0 git clone https://github.com/KernelSU/KernelSU.git KernelSU -b legacy
 
             echo "[+] KernelSU cloned successfully."
           fi
