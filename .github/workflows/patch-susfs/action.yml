@@ -46,20 +46,20 @@ runs:
           echo "[+] Adding SUSFS configs to defconfig..."
 
           # Add SUSFS configs
-          cat >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }} << 'EOFCONFIG'
-CONFIG_KSU=y
-CONFIG_KSU_SUSFS=y
-CONFIG_KSU_SUSFS_SUS_PATH=y
-CONFIG_KSU_SUSFS_SUS_MOUNT=y
-CONFIG_KSU_SUSFS_SUS_KSTAT=y
-CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-CONFIG_KSU_SUSFS_ENABLE_LOG=y
-CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-CONFIG_KSU_SUSFS_SUS_MAP=y
-CONFIG_THREAD_INFO_IN_TASK=y
-EOFCONFIG
+          {
+            echo 'CONFIG_KSU=y'
+            echo 'CONFIG_KSU_SUSFS=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_PATH=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_MOUNT=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_KSTAT=y'
+            echo 'CONFIG_KSU_SUSFS_SPOOF_UNAME=y'
+            echo 'CONFIG_KSU_SUSFS_ENABLE_LOG=y'
+            echo 'CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y'
+            echo 'CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y'
+            echo 'CONFIG_KSU_SUSFS_OPEN_REDIRECT=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_MAP=y'
+            echo 'CONFIG_THREAD_INFO_IN_TASK=y'
+          } >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
 
           echo "[+] SUSFS configs added."
 
