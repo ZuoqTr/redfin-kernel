@@ -117,6 +117,9 @@ runs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
 
+          # Disable git credential helper to prevent interactive prompts
+          git config --global credential.helper ""
+
           if [[ -d "KernelSU" ]]; then
             echo "[+] KernelSU already exists, skipping..."
           else
@@ -124,7 +127,7 @@ runs:
 
             # KernelSU-Next uses branch "legacy"
             # See: https://kernelsu.org/guide/how-to-integrate-for-non-gki.html
-            git clone https://github.com/KernelSU-Next/KernelSU.git KernelSU -b legacy
+            GIT_TERMINAL_PROMPT=0 git clone https://github.com/KernelSU-Next/KernelSU.git KernelSU -b legacy
 
             echo "[+] KernelSU cloned successfully."
           fi
