@@ -31,24 +31,20 @@ runs:
 
           echo "[+] Adding manual hook in fs/exec.c..."
 
-          # Add extern declaration if not present
-          if ! grep -q "ksu_handle_execveat.*filename_ptr" fs/exec.c; then
-            sed -i '/^#include <linux\/sched.h>/a\
-extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *flags);' fs/exec.c
-          fi
+          # Check if function exists
+          if grep -q "do_execveat_common" fs/exec.c; then
+            echo "[+] Found do_execveat_common in fs/exec.c"
 
-          # Add ksu_handle_execveat call before the binary handler loads
-          # Find do_execveat_common function and add hook call
-          if grep -q "static int do_execveat_common" fs/exec.c; then
-            if ! grep -q "ksu_handle_execveat.*&fd.*&filename.*&flags" fs/exec.c; then
-              sed -i '/static int do_execveat_common/i\
-\
-/* KernelSU-Next manual hook */\
-ksu_handle_execveat(\&fd, \&filename, \&flags);\
-' fs/exec.c
-              echo "[+] Hook added to do_execveat_common."
-            else
-              echo "[+] Hook already exists in do_execveat_common."
+            # Add extern declaration after includes
+            if ! grep -q "ksu_handle_execveat.*filename_ptr" fs/exec.c; then
+              sed -i '/^#include <linux\/sched.h>/a extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *flags);' fs/exec.c
+              echo "[+] Added extern declaration."
+            fi
+
+            # Add hook call - insert before "struct filename *filename" in do_execveat_common
+            if ! grep -q "ksu_handle_execveat" fs/exec.c; then
+              sed -i '/struct filename \*filename;/i\    ksu_handle_execveat(\&fd, \&filename, \&flags);' fs/exec.c
+              echo "[+] Added ksu_handle_execveat call."
             fi
           else
             echo "[-] do_execveat_common not found in fs/exec.c."
@@ -61,25 +57,20 @@ ksu_handle_execveat(\&fd, \&filename, \&flags);\
 
           echo "[+] Adding manual hook in fs/open.c..."
 
-          # Add extern declaration if not present
-          if ! grep -q "ksu_handle_execveat.*filename_ptr" fs/open.c; then
-            sed -i '/^#include <linux\/fs.h>/a\
-extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *flags);' fs/open.c
-          fi
+          # Check if function exists
+          if grep -q "do_sys_open" fs/open.c; then
+            echo "[+] Found do_sys_open in fs/open.c"
 
-          # Add hook in do_sys_open
-          if grep -q "long do_sys_open" fs/open.c; then
-            if ! grep -q "ksu_handle_execveat.*&fd.*&filename.*&flags" fs/open.c; then
-              # Find the line with "flags = flags;" in do_sys_open and add hook after
-              sed -i '/long do_sys_open/,/^}$/ {
-                /flags = flags;/a\
-\
-    /* KernelSU-Next manual hook */\
-    ksu_handle_execveat(\&fd, \&filename, \&flags);
-              }' fs/open.c
-              echo "[+] Hook added to do_sys_open."
-            else
-              echo "[+] Hook already exists in do_sys_open."
+            # Add extern declaration after includes
+            if ! grep -q "ksu_handle_execveat.*filename_ptr" fs/open.c; then
+              sed -i '/^#include <linux\/fs.h>/a extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *flags);' fs/open.c
+              echo "[+] Added extern declaration."
+            fi
+
+            # Add hook call - insert after "fd = get_unused_fd_flags(flags);" if exists, otherwise after function start
+            if ! grep -q "ksu_handle_execveat" fs/open.c; then
+              sed -i '/get_unused_fd_flags/i\    ksu_handle_execveat(\&fd, \&filename, \&flags);' fs/open.c
+              echo "[+] Added ksu_handle_execveat call."
             fi
           else
             echo "[-] do_sys_open not found in fs/open.c."
@@ -92,42 +83,22 @@ extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *fla
 
           echo "[+] Adding manual hook in fs/stat.c..."
 
-          # Add extern declaration if not present
+          # Add extern declaration after includes
           if ! grep -q "ksu_handle_stat.*filename_ptr" fs/stat.c; then
-            sed -i '/^#include <linux\/path.h>/a\
-extern int ksu_handle_stat(int *dfd, const char __user **filename_ptr, int *flags);' fs/stat.c
+            sed -i '/^#include <linux\/path.h>/a extern int ksu_handle_stat(int *dfd, const char __user **filename_ptr, int *flags);' fs/stat.c
+            echo "[+] Added extern declaration."
           fi
 
-          # Add hook in vfs_statx or do_statx functions
-          if grep -q "int vfs_statx" fs/stat.c; then
-            if ! grep -q "ksu_handle_stat.*&dfd.*&filename" fs/stat.c; then
-              sed -i '/int vfs_statx/,/^}$/ {
-                /if (filename\[0/,\/return;$/ {
-                  /return;/i\
-\
-        /* KernelSU-Next manual hook */\
-        ksu_handle_stat(\&dfd, \&filename, \&flags);
-                }
-              }' fs/stat.c
-              echo "[+] Hook added to vfs_statx."
-            else
-              echo "[+] Hook already exists in vfs_statx."
+          # Check for vfs_statx
+          if grep -q "vfs_statx" fs/stat.c; then
+            echo "[+] Found vfs_statx in fs/stat.c"
+            if ! grep -q "ksu_handle_stat" fs/stat.c; then
+              sed -i '/int vfs_statx.*filename.*flags/i\    ksu_handle_stat(\&dfd, \&filename, \&flags);' fs/stat.c
+              echo "[+] Added ksu_handle_stat call in vfs_statx."
             fi
           else
-            echo "[-] vfs_statx not found in fs/stat.c, checking for vfs_fstatat..."
-            if grep -q "static int vfs_fstatat" fs/stat.c; then
-              if ! grep -q "ksu_handle_stat.*&dfd.*&filename" fs/stat.c; then
-                sed -i '/static int vfs_fstatat/,/^}$/ {
-                  /return -ENOENT;/i\
-\
-        /* KernelSU-Next manual hook */\
-        ksu_handle_stat(\&dfd, \&filename, \&flags);
-                }
-              fi
-            fi
+            echo "[-] vfs_statx not found in fs/stat.c."
           fi
-
-          echo "[+] fs/stat.c hooks processed."
 
       - name: Verify Manual Hooks
         shell: bash
