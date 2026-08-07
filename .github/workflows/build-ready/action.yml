@@ -138,27 +138,21 @@ runs:
           if [[ -f "scripts/gcc-wrapper.py" ]]; then
             echo "[+] Patching gcc-wrapper.py for Python 3..."
 
-            # Create Python fix script
-            cat > /tmp/fix_gcc_wrapper.py << 'ENDOFPYTHON'
-import re
-
-with open('scripts/gcc-wrapper.py', 'r') as f:
-    content = f.read()
-
-# Convert Python 2 print statements to Python 3
-content = re.sub(r'print\s+"([^"]*)",?\s*$', r'print("\1")', content, flags=re.MULTILINE)
-content = re.sub(r'print\s+"([^"]*)",\s*(.+)', r'print("\1", \2)', content)
-content = re.sub(r'print\s+([^,]+),\s*$', r'print(\1, end="")', content, flags=re.MULTILINE)
-content = re.sub(r'print\s+([^,]+),\s+([^,]+)', r'print(\1, \2)', content)
-content = re.sub(r'print\s+"([^"]*)"', r'print("\1")', content)
-content = re.sub(r'print\s+(.+)', r'print(\1)', content)
-
-with open('scripts/gcc-wrapper.py', 'w') as f:
-    f.write(content)
-
-print("gcc-wrapper.py converted")
-ENDOFPYTHON
-
+            # Create Python fix script using printf
+            printf '%s\n' \
+              "import re" \
+              "with open('scripts/gcc-wrapper.py', 'r') as f:" \
+              "    content = f.read()" \
+              "content = re.sub(r'print\s+\"([^\"]*)\",?\s*\$', r'print(\"\1\")', content, flags=re.MULTILINE)" \
+              "content = re.sub(r'print\s+\"([^\"]*)\",\s*(.+)', r'print(\"\1\", \2)', content)" \
+              "content = re.sub(r'print\s+([^,]+),\s*\$', r'print(\1, end=\"\")', content, flags=re.MULTILINE)" \
+              "content = re.sub(r'print\s+([^,]+),\s+([^,]+)', r'print(\1, \2)', content)" \
+              "content = re.sub(r'print\s+\"([^\"]*)\"', r'print(\"\1\")', content)" \
+              "content = re.sub(r'print\s+(.+)', r'print(\1)', content)" \
+              "with open('scripts/gcc-wrapper.py', 'w') as f:" \
+              "    f.write(content)" \
+              "print('gcc-wrapper.py converted')" \
+              > /tmp/fix_gcc_wrapper.py
             python3 /tmp/fix_gcc_wrapper.py
             echo "[+] gcc-wrapper.py patched."
           fi
