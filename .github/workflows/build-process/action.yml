@@ -14,9 +14,15 @@ runs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          # Setup paths
+          # Setup paths - find clang directory
           if [ -n "${{ env.CLANG_SOURCE }}" ]; then
-            export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+            # Check if extracted to clang-custom or LLVM-*-X64
+            if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
+              export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+            elif [ -d "$GITHUB_WORKSPACE/LLVM"*/bin ]; then
+              export PATH=$(find $GITHUB_WORKSPACE -name "clang" -type f -path "*/bin/clang" 2>/dev/null | head -1 | xargs dirname):$PATH
+            fi
+            echo "[+] Clang path added to PATH"
           fi
 
           if [ -n "${{ env.GCC_64 }}" ]; then
