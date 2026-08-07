@@ -132,11 +132,13 @@ runs:
             echo "[+] KernelSU cloned successfully."
           fi
 
-          # Apply revert commit for SUSFS compatibility
+          # Apply revert commit for SUSFS compatibility (if exists)
           # See: https://github.com/tiann/KernelSU/commit/898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899
           if git rev-parse --verify 898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899 >/dev/null 2>&1; then
             echo "[+] Applying revert commit for SUSFS..."
-            cd KernelSU && git revert --no-commit 898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899
+            cd KernelSU && git revert --no-commit 898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899 || echo "[!] Revert failed, continuing..."
             cd ..
             echo "[+] Revert applied."
+          else
+            echo "[+] Commit 898e9d4f not found, skipping revert."
           fi
