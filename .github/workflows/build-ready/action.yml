@@ -111,7 +111,7 @@ runs:
             false
           fi
 
-      - name: Setup KernelSU (Auto)
+      - name: Setup KernelSU-Next
         if: env.KERNELSU_AUTO_GET == 'true'
         shell: bash
         run: |
@@ -120,14 +120,12 @@ runs:
           # Disable git credential helper to prevent interactive prompts
           git config --global credential.helper ""
 
-          if [[ -d "KernelSU" ]]; then
-            echo "[+] KernelSU already exists, skipping..."
+          if [[ -d "KernelSU-Next" ]]; then
+            echo "[+] KernelSU-Next already exists, skipping..."
           else
-            echo "[+] Getting KernelSU..."
+            echo "[+] Getting KernelSU-Next (legacy branch for non-GKI)..."
 
-            # KernelSU-Next uses branch "legacy"
-            # See: https://kernelsu.org/guide/how-to-integrate-for-non-gki.html
-            GIT_TERMINAL_PROMPT=0 git clone https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU -b legacy
+            GIT_TERMINAL_PROMPT=0 git clone https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next -b legacy
 
-            echo "[+] KernelSU cloned successfully."
+            echo "[+] KernelSU-Next cloned successfully."
           fi

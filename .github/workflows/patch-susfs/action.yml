@@ -3,33 +3,83 @@ name: 'Patch SUSFS for Kernel'
 runs:
   using: 'composite'
   steps:
-      - name: Copy SUSFS Patches
+      - name: Clone SUSFS Repository
         if: env.SUSFS_ENABLE == 'true'
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE/device_kernel/
+          cd $GITHUB_WORKSPACE/device_kernel
 
-          echo "[+] Copying SUSFS patches..."
+          echo "[+] Cloning SUSFS repository (kernel-4.19 branch)..."
+          GIT_TERMINAL_PROMPT=0 git clone https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu -b kernel-4.19 --depth=1
 
-          # Copy fs patches
-          if [ -d "/tmp/Patches/fs" ]; then
-            cp -f /tmp/Patches/fs/* fs/
-            echo "[+] FS patches copied."
+          echo "[+] SUSFS repository cloned."
+
+      - name: Copy SUSFS Source Files
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Copying SUSFS source files..."
+
+          # Copy fs files (these contain SUSFS hooks)
+          cp -f susfs4ksu/kernel_patches/fs/* fs/
+          echo "[+] FS files copied."
+
+          # Copy headers (these contain SUSFS definitions)
+          cp -f susfs4ksu/kernel_patches/include/linux/* include/linux/
+          echo "[+] Headers copied."
+
+          echo "[+] All SUSFS source files copied."
+
+      - name: Add susfs.o to fs/Makefile
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Adding susfs.o to fs/Makefile..."
+
+          if ! grep -q "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" fs/Makefile; then
+            sed -i '/^obj-y :=.*open.o/i obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
+            echo "[+] susfs.o added to fs/Makefile."
+          else
+            echo "[+] susfs.o already in fs/Makefile."
           fi
 
-          # Copy include patches
-          if [ -d "/tmp/Patches/include" ]; then
-            cp -f /tmp/Patches/include/linux/* include/linux/
-            echo "[+] Include patches copied."
+      - name: Add SUSFS fields to task_struct
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Adding SUSFS fields to task_struct..."
+
+          # Add TASK_STRUCT_NON_ROOT_USER_APP_PROC to susfs_def.h if not present
+          if ! grep -q "TASK_STRUCT_NON_ROOT_USER_APP_PROC" include/linux/susfs_def.h; then
+            sed -i '/#define TASK_STRUCT_NON_ROOT_USER_APP_PROC/d' include/linux/susfs_def.h 2>/dev/null || true
+            sed -i '/#define TASK_STRUCT_.*BIT/a #define TASK_STRUCT_NON_ROOT_USER_APP_PROC BIT(0)' include/linux/susfs_def.h 2>/dev/null || true
           fi
 
-          # Copy main kernel patch
-          if [ -f "/tmp/Patches/Patch/50_add_susfs_in_kernel-4.19.patch" ]; then
-            cp -f /tmp/Patches/Patch/50_add_susfs_in_kernel-4.19.patch ./
-            echo "[+] Main kernel patch copied."
+          # Add susfs_task_state to task_struct in sched.h if not present
+          if ! grep -q "susfs_task_state" include/linux/sched.h; then
+            echo "[+] Adding susfs_task_state to task_struct..."
+
+            # Insert before randomized_struct_fields_end
+            sed -i '/randomized_struct_fields_end/i\
+\
+#ifdef CONFIG_KSU_SUSFS\
+    u64 susfs_task_state;\
+    u64 susfs_last_fake_mnt_id;\
+#endif\
+' include/linux/sched.h
+
+            echo "[+] susfs_task_state added to task_struct."
+          else
+            echo "[+] susfs_task_state already in task_struct."
           fi
 
-          echo "[+] All SUSFS patches copied."
+          echo "[+] SUSFS fields added."
 
       - name: Set KSU and SUSFS for DEFCONFIG
         if: env.SUSFS_ENABLE == 'true'
@@ -40,42 +90,18 @@ runs:
           echo "[+] Adding SUSFS configs to defconfig..."
 
           # Add SUSFS configs
-          {
-            echo 'CONFIG_KSU=y'
-            echo 'CONFIG_KSU_SUSFS=y'
-            echo 'CONFIG_KSU_SUSFS_SUS_PATH=y'
-            echo 'CONFIG_KSU_SUSFS_SUS_MOUNT=y'
-            echo 'CONFIG_KSU_SUSFS_SUS_KSTAT=y'
-            echo 'CONFIG_KSU_SUSFS_SPOOF_UNAME=y'
-            echo 'CONFIG_KSU_SUSFS_ENABLE_LOG=y'
-            echo 'CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y'
-            echo 'CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y'
-            echo 'CONFIG_KSU_SUSFS_OPEN_REDIRECT=y'
-            echo 'CONFIG_KSU_SUSFS_SUS_MAP=y'
-            echo 'CONFIG_THREAD_INFO_IN_TASK=y'
-          } >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
+          cat >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }} << 'EOF'
+CONFIG_KPROBES=n
+CONFIG_KSU=y
+CONFIG_KSU_KPROBES_HOOK=n
+CONFIG_KSU_SUSFS=y
+CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+CONFIG_KSU_SUSFS_SUS_PATH=y
+CONFIG_KSU_SUSFS_SUS_MOUNT=y
+CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+CONFIG_KSU_SUSFS_SUS_KSTAT=y
+CONFIG_KSU_SUSFS_SUS_SU=n
+EOF
 
           echo "[+] SUSFS configs added."
-
-      - name: Apply SUSFS Patch
-        if: env.SUSFS_ENABLE == 'true'
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel/
-
-          # KernelSU-Next already has SUSFS support built-in
-          # Only apply the main kernel patch if it exists
-          if [ -f "50_add_susfs_in_kernel-4.19.patch" ]; then
-            echo "[+] Applying main SUSFS kernel patch..."
-            if ! patch -p1 < 50_add_susfs_in_kernel-4.19.patch; then
-              echo "[-] Main kernel patch failed! Check for conflicts."
-              find . -name "*.rej" -exec cat {} \;
-              exit 1
-            fi
-
-            # Remove .orig files
-            find . -name "*.orig" -delete 2>/dev/null || true
-            echo "[+] Main kernel patch applied."
-          else
-            echo "[+] No kernel patch file found, skipping."
-          fi

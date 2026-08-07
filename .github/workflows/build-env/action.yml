@@ -86,7 +86,7 @@ runs:
 
           # Set curlx
           mv $GITHUB_WORKSPACE/Bin /tmp/
-          chmod 777 /tmp/Bin/curlx.sh
+          chmod 755 /tmp/Bin/curlx.sh
           echo "CURLX=/tmp/Bin/curlx.sh" >> $GITHUB_ENV
 
           # Copy Shell

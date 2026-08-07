@@ -21,10 +21,10 @@ runs:
             echo "[+] Created flashable zip."
           fi
 
-          # Copy KernelSU for version tracking
-          if [ -d "KernelSU" ]; then
-            cp -r KernelSU $GITHUB_WORKSPACE/output/
-            echo "[+] KernelSU copied for version tracking."
+          # Copy KernelSU-Next for version tracking
+          if [ -d "KernelSU-Next" ]; then
+            cp -r KernelSU-Next $GITHUB_WORKSPACE/output/
+            echo "[+] KernelSU-Next copied for version tracking."
           fi
 
           # Copy kernel image

@@ -1,57 +1,151 @@
-name: 'Patch Kernel for no-kprobe hooks'
+name: 'Patch Kernel for no-kprobe hooks (Manual Hooks)'
 
 runs:
   using: 'composite'
   steps:
-      - name: Disable KPROBE hooks in KernelSU
+      - name: Check KernelSU-Next directory
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          echo "[+] Checking KernelSU..."
+          echo "[+] Checking KernelSU-Next..."
 
-          if [ -d "KernelSU" ]; then
-            echo "[+] KernelSU directory found."
+          if [ -d "KernelSU-Next" ]; then
+            echo "[+] KernelSU-Next directory found."
 
-            # Disable kprobe hooks as per SUSFS instructions
-            # Replace all #ifdef CONFIG_KPROBES with #if defined(CONFIG_KPROBES) && 0
-            echo "[+] Disabling kprobe hooks in KernelSU..."
+            # Disable kprobe hooks in KernelSU-Next as per official instructions
+            echo "[+] Disabling kprobe hooks in KernelSU-Next..."
 
-            find KernelSU -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i \
+            find KernelSU-Next -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i \
               's/#ifdef CONFIG_KPROBES/#if defined(CONFIG_KPROBES) \&\& 0/g' {} \;
 
-            echo "[+] Kprobe hooks disabled in KernelSU."
+            echo "[+] Kprobe hooks disabled in KernelSU-Next."
           else
-            echo "[-] KernelSU not found, skipping kprobe disable."
+            echo "[-] KernelSU-Next not found, skipping kprobe disable."
           fi
 
-      - name: Copy SUSFS Inline Hook Patches
+      - name: Add Manual Hook in fs/exec.c
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          echo "[+] Copying hook scripts..."
+          echo "[+] Adding manual hook in fs/exec.c..."
 
-          # Copy susfs inline hook patches
-          if [ -f "/tmp/Patches/susfs_inline_hook_patches.sh" ]; then
-            cp /tmp/Patches/susfs_inline_hook_patches.sh ./
-            echo "[+] susfs_inline_hook_patches.sh copied."
+          # Add extern declaration if not present
+          if ! grep -q "ksu_handle_execveat.*filename_ptr" fs/exec.c; then
+            sed -i '/^#include <linux\/sched.h>/a\
+extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *flags);' fs/exec.c
           fi
 
-      - name: Apply SUSFS Inline Hooks
-        if: env.SUSFS_ENABLE == 'true'
+          # Add ksu_handle_execveat call before the binary handler loads
+          # Find do_execveat_common function and add hook call
+          if grep -q "static int do_execveat_common" fs/exec.c; then
+            if ! grep -q "ksu_handle_execveat.*&fd.*&filename.*&flags" fs/exec.c; then
+              sed -i '/static int do_execveat_common/i\
+\
+/* KernelSU-Next manual hook */\
+ksu_handle_execveat(\&fd, \&filename, \&flags);\
+' fs/exec.c
+              echo "[+] Hook added to do_execveat_common."
+            else
+              echo "[+] Hook already exists in do_execveat_common."
+            fi
+          else
+            echo "[-] do_execveat_common not found in fs/exec.c."
+          fi
+
+      - name: Add Manual Hook in fs/open.c
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          echo "[+] Applying SUSFS inline hooks..."
+          echo "[+] Adding manual hook in fs/open.c..."
 
-          if [ -f "susfs_inline_hook_patches.sh" ]; then
-            bash susfs_inline_hook_patches.sh ./
-            echo "[+] SUSFS inline hooks applied."
-          else
-            echo "[-] susfs_inline_hook_patches.sh not found!"
-            # Don't fail - KernelSU may have built-in hooks
+          # Add extern declaration if not present
+          if ! grep -q "ksu_handle_execveat.*filename_ptr" fs/open.c; then
+            sed -i '/^#include <linux\/fs.h>/a\
+extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, int *flags);' fs/open.c
           fi
 
-          echo "[+] Hook patching completed."
+          # Add hook in do_sys_open
+          if grep -q "long do_sys_open" fs/open.c; then
+            if ! grep -q "ksu_handle_execveat.*&fd.*&filename.*&flags" fs/open.c; then
+              # Find the line with "flags = flags;" in do_sys_open and add hook after
+              sed -i '/long do_sys_open/,/^}$/ {
+                /flags = flags;/a\
+\
+    /* KernelSU-Next manual hook */\
+    ksu_handle_execveat(\&fd, \&filename, \&flags);
+              }' fs/open.c
+              echo "[+] Hook added to do_sys_open."
+            else
+              echo "[+] Hook already exists in do_sys_open."
+            fi
+          else
+            echo "[-] do_sys_open not found in fs/open.c."
+          fi
+
+      - name: Add Manual Hook in fs/stat.c
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          echo "[+] Adding manual hook in fs/stat.c..."
+
+          # Add extern declaration if not present
+          if ! grep -q "ksu_handle_stat.*filename_ptr" fs/stat.c; then
+            sed -i '/^#include <linux\/path.h>/a\
+extern int ksu_handle_stat(int *dfd, const char __user **filename_ptr, int *flags);' fs/stat.c
+          fi
+
+          # Add hook in vfs_statx or do_statx functions
+          if grep -q "int vfs_statx" fs/stat.c; then
+            if ! grep -q "ksu_handle_stat.*&dfd.*&filename" fs/stat.c; then
+              sed -i '/int vfs_statx/,/^}$/ {
+                /if (filename\[0/,\/return;$/ {
+                  /return;/i\
+\
+        /* KernelSU-Next manual hook */\
+        ksu_handle_stat(\&dfd, \&filename, \&flags);
+                }
+              }' fs/stat.c
+              echo "[+] Hook added to vfs_statx."
+            else
+              echo "[+] Hook already exists in vfs_statx."
+            fi
+          else
+            echo "[-] vfs_statx not found in fs/stat.c, checking for vfs_fstatat..."
+            if grep -q "static int vfs_fstatat" fs/stat.c; then
+              if ! grep -q "ksu_handle_stat.*&dfd.*&filename" fs/stat.c; then
+                sed -i '/static int vfs_fstatat/,/^}$/ {
+                  /return -ENOENT;/i\
+\
+        /* KernelSU-Next manual hook */\
+        ksu_handle_stat(\&dfd, \&filename, \&flags);
+                }
+              fi
+            fi
+          fi
+
+          echo "[+] fs/stat.c hooks processed."
+
+      - name: Verify Manual Hooks
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/
+
+          echo "[+] Verifying manual hooks..."
+
+          echo "=== fs/exec.c hooks ==="
+          grep -n "ksu_handle_execveat" fs/exec.c || echo "No hooks found"
+
+          echo ""
+          echo "=== fs/open.c hooks ==="
+          grep -n "ksu_handle_execveat" fs/open.c || echo "No hooks found"
+
+          echo ""
+          echo "=== fs/stat.c hooks ==="
+          grep -n "ksu_handle_stat" fs/stat.c || echo "No hooks found"
+
+          echo ""
+          echo "[+] Hook verification complete."
