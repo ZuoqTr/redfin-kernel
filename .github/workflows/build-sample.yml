@@ -15,7 +15,7 @@ env:
 
   # Kernel source
   KERNEL_SOURCE: "https://android.googlesource.com/kernel/msm"
-  KERNEL_BRANCH: "android-msm-redfin-4.19-android11-qpr3"
+  KERNEL_BRANCH: "android-msm-redfin-4.19-android11-qpr1"
 
   # Clang config
   CLANG_SOURCE: "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz"
@@ -56,7 +56,7 @@ env:
   # Device specific
   NEED_DTBO: false
   NEED_SAFE_DTBO: false
-  ROM_TEXT: "android11"
+  ROM_TEXT: "android11-qpr1"
 
   # Other env
   PYTHON_VERSION: "3"
