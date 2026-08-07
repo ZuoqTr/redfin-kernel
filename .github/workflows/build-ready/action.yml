@@ -129,3 +129,17 @@ runs:
 
             echo "[+] KernelSU-Next cloned successfully."
           fi
+
+      - name: Fix gcc-wrapper.py for Python 3
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          if [[ -f "scripts/gcc-wrapper.py" ]]; then
+            echo "[+] Patching gcc-wrapper.py for Python 3..."
+            # Fix Python 2 print syntax to Python 3
+            sed -i 's/print "error, forbidden warning:", m\.group(2)/print("error, forbidden warning:", m.group(2))/' scripts/gcc-wrapper.py
+            sed -i 's/print "warning, forbidden warning:", m\.group(2)/print("warning, forbidden warning:", m.group(2))/' scripts/gcc-wrapper.py
+            sed -i 's/print "Running externals: ", args/print("Running externals: ", args)/' scripts/gcc-wrapper.py
+            echo "[+] gcc-wrapper.py patched."
+          fi
