@@ -23,46 +23,22 @@ runs:
           echo "[+] Copying SUSFS source files..."
 
           # Copy fs files (these contain SUSFS hooks)
-          cp -f susfs4ksu/kernel_patches/fs/* fs/
-          echo "[+] FS files copied."
+          for f in susfs4ksu/kernel_patches/fs/*.c susfs4ksu/kernel_patches/fs/*.h; do
+            if [ -f "$f" ]; then
+              cp -f "$f" fs/
+              echo "[+] Copied $(basename $f)"
+            fi
+          done
 
           # Copy headers (these contain SUSFS definitions)
-          cp -f susfs4ksu/kernel_patches/include/linux/* include/linux/
-          echo "[+] Headers copied."
+          for f in susfs4ksu/kernel_patches/include/linux/*.h; do
+            if [ -f "$f" ]; then
+              cp -f "$f" include/linux/
+              echo "[+] Copied $(basename $f)"
+            fi
+          done
 
           echo "[+] All SUSFS source files copied."
-
-      - name: Apply SUSFS Kernel Patch
-        if: env.SUSFS_ENABLE == 'true'
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-
-          echo "[+] Applying SUSFS kernel patch..."
-          if patch -p1 --dry-run < susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch 2>&1; then
-            patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch
-            echo "[+] SUSFS kernel patch applied successfully."
-          else
-            echo "[-] SUSFS patch dry-run failed. Continuing without patch..."
-          fi
-
-      - name: Apply KSU-SUSFS Bridge Patch
-        if: env.SUSFS_ENABLE == 'true'
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-
-          if [ -d "KernelSU-Next" ]; then
-            echo "[+] Applying KSU-SUSFS bridge patch..."
-            if patch -p1 --dry-run < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch 2>&1; then
-              patch -p1 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
-              echo "[+] KSU-SUSFS bridge patch applied successfully."
-            else
-              echo "[-] KSU-SUSFS bridge patch dry-run failed. Continuing without patch..."
-            fi
-          else
-            echo "[-] KernelSU-Next not found, skipping bridge patch."
-          fi
 
       - name: Add susfs.o to fs/Makefile
         if: env.SUSFS_ENABLE == 'true'
@@ -72,11 +48,31 @@ runs:
 
           echo "[+] Adding susfs.o to fs/Makefile..."
 
-          if ! grep -q "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" fs/Makefile; then
-            sed -i '/^obj-y :=.*open.o/i obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
+          if ! grep -q "obj-\$(CONFIG_KSU_SUSFS).*susfs.o" fs/Makefile; then
+            sed -i '/^obj-y += open.o/a obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
             echo "[+] susfs.o added to fs/Makefile."
           else
             echo "[+] susfs.o already in fs/Makefile."
+          fi
+
+      - name: Add KSU-SUSFS Bridge Functions
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Adding KSU-SUSFS bridge functions..."
+
+          # Check if bridge file exists from susfs4ksu
+          if [ -f "susfs4ksu/kernel_patches/KernelSU/ksu_susfs.c" ]; then
+            cp -f susfs4ksu/kernel_patches/KernelSU/ksu_susfs.c ./
+            echo "[+] Copied ksu_susfs.c"
+          fi
+
+          # Add ksu_susfs.o to Makefile if bridge file exists
+          if [ -f "ksu_susfs.c" ] && ! grep -q "ksu_susfs.o" Makefile; then
+            sed -i '/obj-.*KSU.*+=/a obj-$(CONFIG_KSU_SUSFS) += ksu_susfs.o' Makefile
+            echo "[+] ksu_susfs.o added to Makefile."
           fi
 
       - name: Add SUSFS fields to task_struct
@@ -88,7 +84,7 @@ runs:
           echo "[+] Adding SUSFS fields to task_struct..."
 
           # Add TASK_STRUCT_NON_ROOT_USER_APP_PROC to susfs_def.h if not present
-          if ! grep -q "TASK_STRUCT_NON_ROOT_USER_APP_PROC" include/linux/susfs_def.h 2>/dev/null; then
+          if [ -f "include/linux/susfs_def.h" ] && ! grep -q "TASK_STRUCT_NON_ROOT_USER_APP_PROC" include/linux/susfs_def.h; then
             echo "#define TASK_STRUCT_NON_ROOT_USER_APP_PROC BIT(0)" >> include/linux/susfs_def.h
             echo "[+] TASK_STRUCT_NON_ROOT_USER_APP_PROC added."
           fi
@@ -97,14 +93,17 @@ runs:
           if ! grep -q "susfs_task_state" include/linux/sched.h 2>/dev/null; then
             echo "[+] Adding susfs_task_state to task_struct..."
 
-            # Use printf with explicit newlines
+            # Create patch content
             printf '\n#ifdef CONFIG_KSU_SUSFS\n    u64 susfs_task_state;\n    u64 susfs_last_fake_mnt_id;\n#endif\n' > /tmp/susfs_sched_patch.txt
 
             # Insert before randomized_struct_fields_end using awk
-            awk '/randomized_struct_fields_end/ {while ((getline line < "/tmp/susfs_sched_patch.txt") > 0) print line} {print}' include/linux/sched.h > /tmp/sched.h.new
-            mv /tmp/sched.h.new include/linux/sched.h
-
-            echo "[+] susfs_task_state added to task_struct."
+            if grep -q "randomized_struct_fields_end" include/linux/sched.h; then
+              awk '/randomized_struct_fields_end/ {while ((getline line < "/tmp/susfs_sched_patch.txt") > 0) print line} {print}' include/linux/sched.h > /tmp/sched.h.new
+              mv /tmp/sched.h.new include/linux/sched.h
+              echo "[+] susfs_task_state added to task_struct."
+            else
+              echo "[-] randomized_struct_fields_end not found, skipping task_struct patch."
+            fi
           else
             echo "[+] susfs_task_state already in task_struct."
           fi
@@ -133,3 +132,11 @@ runs:
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
 
           echo "[+] SUSFS configs added."
+
+      - name: Cleanup SUSFS repo
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          rm -rf susfs4ksu
+          echo "[+] SUSFS repo cleaned up."
