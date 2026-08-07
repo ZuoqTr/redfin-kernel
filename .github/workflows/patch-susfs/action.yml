@@ -75,7 +75,11 @@ EOF
           if [ -f "KernelSU/10_enable_susfs_for_ksu.patch" ]; then
             echo "[+] Applying KernelSU SUSFS enable patch..."
             cd KernelSU
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            if ! patch -p1 < 10_enable_susfs_for_ksu.patch; then
+              echo "[-] KernelSU patch failed! Check for conflicts."
+              find . -name "*.rej" -exec cat {} \;
+              exit 1
+            fi
             cd ..
             echo "[+] KernelSU patch applied."
           fi
@@ -83,16 +87,10 @@ EOF
           # Apply main kernel patch
           if [ -f "50_add_susfs_in_kernel-4.19.patch" ]; then
             echo "[+] Applying main SUSFS kernel patch..."
-            patch -p1 < 50_add_susfs_in_kernel-4.19.patch || true
-
-            # Check for .rej files
-            REJ_COUNT=$(find . -name "*.rej" | wc -l)
-            if [ "$REJ_COUNT" -gt 0 ]; then
-              echo "[-] Found $REJ_COUNT .rej files!"
+            if ! patch -p1 < 50_add_susfs_in_kernel-4.19.patch; then
+              echo "[-] Main kernel patch failed! Check for conflicts."
               find . -name "*.rej" -exec cat {} \;
-              if [[ "${{ env.BUILD_DEBUGGER }}" != "true" ]]; then
-                find . -name "*.rej" -exec rm {} \;
-              fi
+              exit 1
             fi
 
             # Remove .orig files

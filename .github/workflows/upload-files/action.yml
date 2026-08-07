@@ -21,6 +21,12 @@ runs:
             echo "[+] Created flashable zip."
           fi
 
+          # Copy KernelSU for version tracking
+          if [ -d "KernelSU" ]; then
+            cp -r KernelSU $GITHUB_WORKSPACE/output/
+            echo "[+] KernelSU copied for version tracking."
+          fi
+
           # Copy kernel image
           if [ -f "out/arch/${{ env.KERNEL_ARCH }}/boot/Image.lz4" ]; then
             cp out/arch/${{ env.KERNEL_ARCH }}/boot/Image.lz4 $GITHUB_WORKSPACE/output/

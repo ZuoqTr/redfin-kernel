@@ -79,10 +79,12 @@ jobs:
           git tag $NEW_TAG
           git push --tags
 
-          # Get KernelSU version
-          git clone -b legacy https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next
-          KSU_NEXT_VERSION=$(cd KernelSU-Next && expr $(git rev-list --count HEAD) + 10200)
-          rm -rf KernelSU-Next
+          # Get KernelSU version from downloaded artifacts
+          if [ -d "./downloaded-artifacts/KernelSU" ]; then
+            KSU_NEXT_VERSION=$(cd ./downloaded-artifacts/KernelSU && expr $(git rev-list --count HEAD) + 10200)
+          else
+            KSU_NEXT_VERSION="unknown"
+          fi
 
           # Input release note
           cat << EOF > release_notes.md
