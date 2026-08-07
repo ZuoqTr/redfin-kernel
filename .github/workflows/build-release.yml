@@ -112,7 +112,7 @@ jobs:
 
           ## Credits
           - [KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next)
-          - [SUSFS](https://github.com/5ec1cff/SUSFS)
+          - [SUSFS](https://gitlab.com/simonpunk/susfs4ksu)
           EOF
 
           echo "RELEASE_NOTES=$(cat release_notes.md)" >> $GITHUB_ENV
