@@ -67,8 +67,10 @@ runs:
           # Setup paths
           if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
             export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+            echo "[+] Using clang from clang-custom"
           elif [ -d "$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin" ]; then
             export PATH=$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin:$PATH
+            echo "[+] Using clang from LLVM-19.1.7-Linux-X64"
           fi
 
           echo "[+] Running defconfig..."
@@ -82,16 +84,24 @@ runs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          # Setup paths
-          if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
-            export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
-          elif [ -d "$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin" ]; then
-            export PATH=$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin:$PATH
-          fi
-
           echo "======================"
           echo "=Build Kernel Image="
           echo "======================"
+
+          # Setup paths - check both possible locations
+          if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
+            export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+            echo "[+] Using clang from clang-custom"
+          elif [ -d "$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin" ]; then
+            export PATH=$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin:$PATH
+            echo "[+] Using clang from LLVM-19.1.7-Linux-X64"
+          fi
+
+          # Debug: list what's in LLVM folder
+          echo "DEBUG: Contents of $GITHUB_WORKSPACE:"
+          ls -la $GITHUB_WORKSPACE/ | head -20
+          echo "DEBUG: Checking for clang..."
+          which clang && clang --version || echo "[-] clang not found in PATH"
 
           # Build
           make -j$(nproc --all) ARCH=arm64 CC="ccache clang" CLANG_TRIPLE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out 2>&1 | tee build.log
