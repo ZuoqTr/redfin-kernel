@@ -147,6 +147,8 @@ runs:
             sed -i 's/print \([^,]*\),$/print(\1, end="")/' scripts/gcc-wrapper.py
             # print "string" expr -> print("string", expr)
             sed -i 's/print "\([^"]*\)" \(.*\)$/print("\1", \2)/' scripts/gcc-wrapper.py
+            # print args[0] + ':',e.strerror -> print(args[0] + ':', e.strerror)
+            sed -i "s/print \(args\[0\]\) + ':',\(.*\)$/print(\1 + ':', \2)/" scripts/gcc-wrapper.py
 
             echo "[+] gcc-wrapper.py patched."
           fi
