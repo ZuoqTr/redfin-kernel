@@ -138,21 +138,15 @@ runs:
           if [[ -f "scripts/gcc-wrapper.py" ]]; then
             echo "[+] Patching gcc-wrapper.py for Python 3..."
 
-            # Create Python fix script using printf
-            printf '%s\n' \
-              "import re" \
-              "with open('scripts/gcc-wrapper.py', 'r') as f:" \
-              "    content = f.read()" \
-              "content = re.sub(r'print\s+\"([^\"]*)\",?\s*\$', r'print(\"\1\")', content, flags=re.MULTILINE)" \
-              "content = re.sub(r'print\s+\"([^\"]*)\",\s*(.+)', r'print(\"\1\", \2)', content)" \
-              "content = re.sub(r'print\s+([^,]+),\s*\$', r'print(\1, end=\"\")', content, flags=re.MULTILINE)" \
-              "content = re.sub(r'print\s+([^,]+),\s+([^,]+)', r'print(\1, \2)', content)" \
-              "content = re.sub(r'print\s+\"([^\"]*)\"', r'print(\"\1\")', content)" \
-              "content = re.sub(r'print\s+(.+)', r'print(\1)', content)" \
-              "with open('scripts/gcc-wrapper.py', 'w') as f:" \
-              "    f.write(content)" \
-              "print('gcc-wrapper.py converted')" \
-              > /tmp/fix_gcc_wrapper.py
-            python3 /tmp/fix_gcc_wrapper.py
+            # Fix Python 2 print statements using sed
+            # print "string", -> print("string")
+            sed -i 's/print "\(.*\)",\?$/print("\1")/' scripts/gcc-wrapper.py
+            # print var, expr -> print(var, expr)
+            sed -i 's/print \(.*\), \(.*\)$/print(\1, \2)/' scripts/gcc-wrapper.py
+            # print var, -> print(var, end="")
+            sed -i 's/print \([^,]*\),$/print(\1, end="")/' scripts/gcc-wrapper.py
+            # print "string" expr -> print("string", expr)
+            sed -i 's/print "\([^"]*\)" \(.*\)$/print("\1", \2)/' scripts/gcc-wrapper.py
+
             echo "[+] gcc-wrapper.py patched."
           fi
