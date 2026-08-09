@@ -65,7 +65,11 @@ runs:
           echo "======================="
 
           # Setup paths
-          export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+          if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
+            export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+          elif [ -d "$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin" ]; then
+            export PATH=$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin:$PATH
+          fi
 
           echo "[+] Running defconfig..."
           make ARCH=arm64 ${{ env.DEFCONFIG_NAME }} O=out
@@ -79,7 +83,11 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel/
 
           # Setup paths
-          export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+          if [ -d "$GITHUB_WORKSPACE/clang-custom/bin" ]; then
+            export PATH=$GITHUB_WORKSPACE/clang-custom/bin:$PATH
+          elif [ -d "$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin" ]; then
+            export PATH=$GITHUB_WORKSPACE/LLVM-19.1.7-Linux-X64/bin:$PATH
+          fi
 
           echo "======================"
           echo "=Build Kernel Image="
