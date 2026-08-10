@@ -11,7 +11,7 @@ env:
 
   # Build commands
   CUSTOM_CMDS: "CLANG_TRIPLE=aarch64-linux-gnu-"
-  EXTRA_CMDS: "LD=ld.lld LLVM=1 LLVM_IAS=1"
+  EXTRA_CMDS: "LD=ld.lld HOSTLD=ld.lld LLVM=1 LLVM_IAS=1"
 
   # Kernel source
   KERNEL_SOURCE: "https://android.googlesource.com/kernel/msm"
