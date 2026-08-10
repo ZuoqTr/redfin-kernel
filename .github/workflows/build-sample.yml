@@ -19,7 +19,7 @@ env:
 
   # Clang config - clone AOSP prebuilts
   CLANG_SOURCE: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86"
-  CLANG_BRANCH: "android13-release"
+  CLANG_BRANCH: "android11-release"
 
   # Fix Clang 19 register issue
   FIX_STACK_POINTER: "true"
