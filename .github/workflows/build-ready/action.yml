@@ -156,3 +156,19 @@ runs:
 
             echo "[+] gcc-wrapper.py patched."
           fi
+
+      - name: Fix Clang 19 stack_pointer register issue
+        if: env.FIX_STACK_POINTER == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "[+] Fixing Clang 19 register issue in stack_pointer.h..."
+
+          # Backup original
+          cp arch/arm64/include/asm/stack_pointer.h arch/arm64/include/asm/stack_pointer.h.bak
+
+          # Fix the global register variable issue
+          sed -i 's/register long sp asm("sp");/\/\/ register long sp asm("sp"); \/\/ Disabled for Clang 19/' arch/arm64/include/asm/stack_pointer.h
+
+          echo "[+] stack_pointer.h patched."

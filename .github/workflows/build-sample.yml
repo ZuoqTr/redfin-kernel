@@ -18,8 +18,11 @@ env:
   KERNEL_BRANCH: "android-msm-redfin-4.19-android11-qpr1"
 
   # Clang config
-  CLANG_SOURCE: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-Linux-X64.tar.xz"
+  CLANG_SOURCE: "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz"
   CLANG_BRANCH: ""
+
+  # Fix Clang 19 register issue
+  FIX_STACK_POINTER: "true"
 
   # GCC (not used, using Clang)
   GCC_GNU: false
