@@ -17,9 +17,9 @@ env:
   KERNEL_SOURCE: "https://android.googlesource.com/kernel/msm"
   KERNEL_BRANCH: "android-msm-redfin-4.19-android11-qpr1"
 
-  # Clang config
-  CLANG_SOURCE: "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz"
-  CLANG_BRANCH: ""
+  # Clang config - clone AOSP prebuilts
+  CLANG_SOURCE: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86"
+  CLANG_BRANCH: "android13-release"
 
   # Fix Clang 19 register issue
   FIX_STACK_POINTER: "true"
