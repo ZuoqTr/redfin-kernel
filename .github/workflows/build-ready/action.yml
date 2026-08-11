@@ -52,8 +52,9 @@ runs:
           echo "::group::[+] Downloading Clang..."
           if [[ "${{ env.CLANG_SOURCE }}" == *"releases"* ]]; then
             # Download from GitHub releases (may be .tar.zst, .tar.xz, .tar.gz)
-            wget -q "${{ env.CLANG_SOURCE }}/${{ env.CLANG_BRANCH }}" -O clang.tar
+            wget -L -q "${{ env.CLANG_SOURCE }}/${{ env.CLANG_BRANCH }}" -O clang.tar
             echo "[+] Tarball downloaded."
+            ls -la clang.tar 2>/dev/null || echo "[-] Download failed!"
 
             # Detect compression type and extract
             if [[ "${{ env.CLANG_BRANCH }}" == *".zst"* ]]; then
@@ -65,6 +66,7 @@ runs:
             fi
             rm clang.tar
             echo "[+] Clang extracted."
+            ls -la
 
             # Setup bin path - LLVM releases extract to clang+llvm-*/
             mkdir -p clang-custom
