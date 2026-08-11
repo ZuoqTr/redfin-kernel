@@ -58,6 +58,15 @@ runs:
           else
             git clone "${{ env.CLANG_SOURCE }}" -b "${{ env.CLANG_BRANCH }}" clang-custom --depth=1
             echo "[+] Clang cloned."
+
+            # Fix AOSP clang path - binaries are in nested directory
+            if [ -d "clang-custom/prebuilts/clang/host/linux-x86" ]; then
+              CLANG_DIR=$(find clang-custom/prebuilts/clang/host/linux-x86 -maxdepth 1 -type d -name "clang-*" | head -1)
+              if [ -n "$CLANG_DIR" ] && [ -d "$CLANG_DIR/bin" ]; then
+                ln -sfn "$CLANG_DIR/bin" clang-custom/bin
+                echo "[+] Created symlink: clang-custom/bin -> $CLANG_DIR/bin"
+              fi
+            fi
           fi
           echo "::endgroup::"
 
