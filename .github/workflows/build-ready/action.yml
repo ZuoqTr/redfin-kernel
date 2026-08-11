@@ -51,10 +51,28 @@ runs:
 
           echo "::group::[+] Downloading Clang..."
           if [[ "${{ env.CLANG_SOURCE }}" == *"releases"* ]]; then
-            wget -q "${{ env.CLANG_SOURCE }}" -O clang.tar.xz
-            tar -xf clang.tar.xz
-            rm clang.tar.xz
+            # Download from GitHub releases (may be .tar.zst, .tar.xz, .tar.gz)
+            wget -q "${{ env.CLANG_SOURCE }}/${{ env.CLANG_BRANCH }}" -O clang.tar
+            echo "[+] Tarball downloaded."
+            # Detect compression type and extract
+            if [[ "${{ env.CLANG_BRANCH }}" == *".zst"* ]]; then
+              tar -I zstd -xf clang.tar
+            elif [[ "${{ env.CLANG_BRANCH }}" == *".xz"* ]]; then
+              tar -Jxf clang.tar
+            else
+              tar -xf clang.tar
+            fi
+            rm clang.tar
             echo "[+] Clang extracted."
+
+            # Setup bin path - proton-clang extracts to bin/
+            if [ -d "bin/bin" ]; then
+              ln -sfn "$(pwd)/bin" clang-custom
+              echo "[+] Symlinked: bin/"
+            elif [ -d "clang/bin" ]; then
+              ln -sfn "$(pwd)/clang" clang-custom
+              echo "[+] Symlinked: clang/"
+            fi
           elif [[ "${{ env.CLANG_SOURCE }}" == *"googlesource"* ]]; then
             # Download AOSP clang tarball directly
             wget -q "${{ env.CLANG_SOURCE }}/+archive/${{ env.CLANG_BRANCH }}.tar.gz" -O clang.tar.gz

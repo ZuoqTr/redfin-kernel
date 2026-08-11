@@ -17,9 +17,9 @@ env:
   KERNEL_SOURCE: "https://android.googlesource.com/kernel/msm"
   KERNEL_BRANCH: "android-msm-redfin-4.19-android11-qpr1"
 
-  # Clang config - clone AOSP prebuilts
-  CLANG_SOURCE: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86"
-  CLANG_BRANCH: "android12-release"
+  # Clang config - download from proton-clang releases
+  CLANG_SOURCE: "https://github.com/kdrag0n/proton-clang/releases/download/clang-17.0.6"
+  CLANG_BRANCH: "proton-clang-linux-x86_64.tar.zst"
 
   # Fix Clang 19 register issue
   FIX_STACK_POINTER: "true"

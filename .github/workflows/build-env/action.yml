@@ -101,7 +101,7 @@ runs:
             flex bison libssl-dev libelf-dev libdw-dev \
             kmod device-tree-compiler lz4 \
             xz-utils zlib1g-dev python3 git curl wget \
-            cpio unzip rsync tar 2>&1 | tail -5
+            cpio unzip rsync tar zstd 2>&1 | tail -5
 
       - name: Set GCC paths
         if: env.GCC_GNU == 'true'
