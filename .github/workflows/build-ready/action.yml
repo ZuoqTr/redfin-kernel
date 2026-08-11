@@ -70,17 +70,21 @@ runs:
 
             # Setup bin path - LLVM releases extract to clang+llvm-*/
             mkdir -p clang-custom
-            # Search for clang binary anywhere
-            CLANG_PATH=$(find . -name "clang" -type f -executable 2>/dev/null | head -1)
-            if [ -n "$CLANG_PATH" ]; then
-              CLANG_DIR=$(dirname "$CLANG_PATH")
-              ln -sfn "$CLANG_DIR" clang-custom/bin
-              echo "[+] Symlinked: $CLANG_DIR"
-              ls -la clang-custom/bin/clang* 2>/dev/null || echo "clang files:"
+            # LLVM tarball structure: clang+llvm-*/bin/clang
+            if [ -d "clang+llvm-*/bin" ]; then
+              CLANG_BIN=$(find . -path "*/bin/clang" -type f -executable 2>/dev/null | head -1)
+              if [ -n "$CLANG_BIN" ]; then
+                CLANG_DIR=$(dirname "$CLANG_BIN")
+                ln -sfn "$CLANG_DIR" clang-custom/bin
+                echo "[+] Symlinked: $CLANG_DIR"
+                ls -la clang-custom/bin/clang* 2>/dev/null
+              else
+                echo "[-] Could not find clang in bin/ subdirectory!"
+                ls -la clang+llvm-*/bin/ 2>/dev/null | head -10
+              fi
             else
-              echo "[-] Could not find clang binary!"
-              ls -la
-              find . -type d 2>/dev/null | head -20
+              echo "[-] bin/ directory not found!"
+              ls -la clang+llvm-*/ 2>/dev/null | head -10
             fi
           elif [[ "${{ env.CLANG_SOURCE }}" == *"googlesource"* ]]; then
             # Download AOSP clang tarball directly
