@@ -60,11 +60,28 @@ runs:
             wget -q "${{ env.CLANG_SOURCE }}/+archive/${{ env.CLANG_BRANCH }}.tar.gz" -O clang.tar.gz
             tar -xzf clang.tar.gz
             rm clang.tar.gz
-            # AOSP clang extracts to prebuilts/clang/host/linux-x86
+            echo "[+] Clang tarball extracted."
+
+            # Find clang bin directory - AOSP clang structure varies
+            mkdir -p clang-custom
             if [ -d "prebuilts/clang/host/linux-x86/bin" ]; then
-              mkdir -p clang-custom
               ln -sfn "$(pwd)/prebuilts/clang/host/linux-x86" clang-custom/bin
-              echo "[+] Clang extracted and symlinked."
+              echo "[+] Symlinked: prebuilts/clang/host/linux-x86/bin"
+            elif [ -d "clang/bin" ]; then
+              ln -sfn "$(pwd)/clang" clang-custom/bin
+              echo "[+] Symlinked: clang/bin"
+            else
+              # Search for clang binary anywhere
+              CLANG_PATH=$(find . -name "clang" -type f -executable 2>/dev/null | head -1)
+              if [ -n "$CLANG_PATH" ]; then
+                CLANG_DIR=$(dirname "$CLANG_PATH")
+                ln -sfn "$CLANG_DIR" clang-custom/bin
+                echo "[+] Symlinked: $CLANG_DIR"
+              else
+                echo "[-] Could not find clang binary!"
+                ls -la
+                find . -type d -name "*clang*" 2>/dev/null | head -10
+              fi
             fi
           else
             git clone "${{ env.CLANG_SOURCE }}" -b "${{ env.CLANG_BRANCH }}" clang-custom --depth=1
