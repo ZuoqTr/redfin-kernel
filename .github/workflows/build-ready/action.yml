@@ -64,14 +64,28 @@ runs:
             fi
             rm clang.tar
             echo "[+] Clang extracted."
+            ls -la
 
-            # Setup bin path - proton-clang extracts to bin/
+            # Setup bin path - proton-clang extracts to proton-clang-linux-x86_64/
+            mkdir -p clang-custom
             if [ -d "bin/bin" ]; then
-              ln -sfn "$(pwd)/bin" clang-custom
+              ln -sfn "$(pwd)/bin" clang-custom/bin
               echo "[+] Symlinked: bin/"
             elif [ -d "clang/bin" ]; then
-              ln -sfn "$(pwd)/clang" clang-custom
+              ln -sfn "$(pwd)/clang" clang-custom/bin
               echo "[+] Symlinked: clang/"
+            else
+              # Search for clang binary anywhere
+              CLANG_PATH=$(find . -name "clang" -type f -executable 2>/dev/null | head -1)
+              if [ -n "$CLANG_PATH" ]; then
+                CLANG_DIR=$(dirname "$CLANG_PATH")
+                ln -sfn "$CLANG_DIR" clang-custom/bin
+                echo "[+] Symlinked: $CLANG_DIR"
+              else
+                echo "[-] Could not find clang binary!"
+                ls -la
+                find . -type d 2>/dev/null | head -20
+              fi
             fi
           elif [[ "${{ env.CLANG_SOURCE }}" == *"googlesource"* ]]; then
             # Download AOSP clang tarball directly
